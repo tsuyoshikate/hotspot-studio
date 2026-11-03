@@ -1,0 +1,7 @@
+{
+  "name": "hotspot-studio",
+  "version": "1.0.0",
+  "private": true,
+  "description": "热点营销工作台(演示版):新闻抓取 → 商品匹配 → LLM 文案 → 审核发送,含后台与评测台",
+  "engines": { "node": ">=18" }
+}
