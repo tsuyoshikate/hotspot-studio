@@ -230,12 +230,14 @@ C.validate=function(text,ctx,rules){
 };
 
 /* ───────── 调用 Dify 工作流(通过 /api/dify,密钥在服务端) ───────── */
-C.DIFY_SOURCES=['热点标题','热点摘要','话题标签','客户画像名','客户画像全文','第一件商品名','全部商品名','商品清单','真实素材','风格名','固定值'];
+C.DIFY_SOURCES=['热点标题','热点摘要','话题标签','客户画像名','客户画像全文','第一件商品名','全部商品名','热点标题+摘要','商品名+卖点','商品清单','真实素材','风格名','固定值'];
 C.difySource=function(src,ctx,fixed){
   const ps=C.ctxPersona(ctx)||{};
   switch(src){
     case '热点标题':return ctx.news.title;
     case '热点摘要':return ctx.news.summary||'';
+    case '热点标题+摘要':return ctx.news.title+(ctx.news.summary?'\n'+ctx.news.summary:'');
+    case '商品名+卖点':return ctx.products.map(p=>p.name+(p.selling?':'+p.selling:'')).join('\n');
     case '话题标签':return '#'+ctx.news.tag+'#';
     case '客户画像名':return ps.name||'';
     case '客户画像全文':return ['是谁:'+(ps.who||''),'处境:'+(ps.situation||''),'痛点:'+(ps.pain||''),'真实问题:'+(ps.question||'无'),'想要:'+(ps.want||''),'不行动的后果:'+(ps.consequence||'无'),'讲法:'+(ps.pitch||'')].join('\n');
@@ -251,6 +253,17 @@ C.difySource=function(src,ctx,fixed){
 C.difyInputs=function(ctx,cfg){
   const o={}; ((cfg&&cfg.inputs)||[]).forEach(x=>{ if(x.var&&x.var.trim()) o[x.var.trim()]=String(C.difySource(x.src,ctx,x.fixed)).slice(0,4000); }); return o;
 };
+// Dify 返回的是整份 Markdown 报告:封面图 + 若干篇 + 跳过的新闻。工作台指定了热点,取「第 1 篇」当正文。
+C.parseDifyReport=function(t){
+  t=String(t||''); const cover=(t.match(/!\[[^\]]*\]\(([^)\s]+)\)/)||[])[1]||'';
+  const m=t.match(/##\s*第\s*1\s*篇([\s\S]*?)(?=\n---|\n##\s|$)/);
+  if(!m) return {body:t.replace(/!\[[^\]]*\]\([^)]*\)/,'').replace(/^\*封面图链接.*$/m,''),cover,review:''};
+  let b=m[1]; let review='';
+  b=b.replace(/^\s*原文[:：].*$/m,'');
+  b=b.replace(/\*\*审核提示\*\*\s*\n(?:[ \t]*[-*•].*\n?)*/,x=>{review=x.replace(/\*\*审核提示\*\*/,'').trim();return '';});
+  b=b.replace(/^\s*(通过|需修改|不通过|需人工判断)\s*$/m,'');
+  return {body:b.replace(/\n{3,}/g,'\n\n').trim(),cover,review};
+};
 C.callDify=async function(ctx,opt){
   opt=opt||{}; const m=opt.modelCfg||Store.get('model'); const cfg=m.dify||{inputs:[]}; const t0=performance.now();
   const inputs=C.difyInputs(ctx,cfg);
@@ -263,13 +276,15 @@ C.callDify=async function(ctx,opt){
   const raw=await r.text(); let j=null; try{j=JSON.parse(raw);}catch(e){}
   if(!r.ok&&(r.status===404||r.status===501)&&!j) throw new Error('服务端接口 /api/dify 不存在(当前环境没有后端函数,请部署到 Vercel 后再用)');
   if(!r.ok||!j) throw new Error((j&&j.error&&(j.error.message||j.error))||('调用失败('+r.status+')'));
-  if(j.status&&j.status!=='succeeded') throw new Error(j.status==='paused'?'Dify 工作流停在了需要人工介入的节点,接口调用会一直等下去。请检查 Dify 工作流里是否还有“人工介入”节点,有的话改成 Agent 或加分支绕开(见 README)':('Dify 工作流没有成功:'+(j.error||j.status)));
+  if(j.status&&j.status!=='succeeded'&&j.status!=='partial-succeeded') throw new Error(j.status==='paused'?'Dify 工作流停在了需要人工介入的节点,接口调用会一直等下去。请检查 Dify 工作流里是否还有“人工介入”节点,有的话改成 Agent 或加分支绕开(见 README)':('Dify 工作流没有成功:'+(j.error||j.status)));
   const outs=j.outputs||{}; let text='';
   if(cfg.outputKey&&outs[cfg.outputKey]!=null) text=outs[cfg.outputKey];
   else{ const strs=Object.values(outs).filter(v=>typeof v==='string').sort((a,b)=>b.length-a.length); text=strs[0]||''; }
+  if(!text&&j.status==='partial-succeeded') throw new Error('Dify 工作流部分节点失败(partial-succeeded),而且没有产出文案'+(j.error?':'+j.error:'')+'。请到 Dify 的运行日志里看哪个节点报错');
   if(!text) throw new Error('Dify 返回成功,但输出里没有文字。返回的输出变量有:'+(Object.keys(outs).join('、')||'无')+'。请在「模型参数」里填对“输出变量名”');
   if(typeof text!=='string') text=JSON.stringify(text,null,2);
-  return {text:text.trim(),ms:Math.round(performance.now()-t0),usage:{in:0,out:j.tokens||0},model:'Dify 工作流',via:'Dify 工作流',mock:false,outKeys:Object.keys(outs),runId:j.runId};
+  const rep=C.parseDifyReport(text);
+  return {text:rep.body.trim(),report:text,cover:rep.cover,review:rep.review,ms:Math.round(performance.now()-t0),usage:{in:0,out:j.tokens||0},model:'Dify 工作流',via:'Dify 工作流',mock:false,outKeys:Object.keys(outs),runId:j.runId,warn:j.status==='partial-succeeded'?('Dify 有部分节点失败,文案已产出(多半是图片或视频那一步),请到 Dify 运行日志查看'+(j.error?':'+j.error:'')):''};
 };
 
 /* ───────── 生成与修正 ───────── */

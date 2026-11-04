@@ -3,7 +3,7 @@ Admin.register({
   id:'model', title:'模型参数', keys:['model'],
   render(el,A){
     const m=A.draft('model');
-    if(!m.dify) m.dify={inputs:[{var:'query',src:'热点标题',fixed:''}],outputKey:'',splitMarker:'审核说明'};
+    if(!m.dify) m.dify=JSON.parse(JSON.stringify(window.DEFAULTS.model.dify));
     const D=m.dify; if(!Array.isArray(D.inputs)) D.inputs=[];
     const modes=[
       ['dify','Dify 工作流(推荐)','写作交给你在 Dify 里搭好的工作流;工作台负责选热点、选商品、选画像和校验'],
@@ -20,7 +20,7 @@ Admin.register({
           <td><select data-is="${i}">${Core.DIFY_SOURCES.map(s=>`<option ${s===x.src?'selected':''}>${s}</option>`).join('')}</select></td>
           <td><input type="text" data-if="${i}" value="${esc(x.fixed||'')}" ${x.src==='固定值'?'':'disabled'}></td>
           <td><button class="btn sm danger" data-id="${i}">删除</button></td></tr>`).join('')}</tbody></table>
-        <button class="btn sm" id="addIn" style="margin-top:8px">+ 增加一个输入</button>
+        <button class="btn sm" id="addIn" style="margin-top:8px">+ 增加一个输入</button> <button class="btn sm" id="dRecommend" style="margin-top:8px" title="hot_news / product / persona / platform 四项,输出变量 final_report">恢复为推荐映射(对应已改造的 Dify 工作流)</button>
         <div class="grid2" style="margin-top:12px">
           <div><label class="f">输出变量名 <span class="hint">Dify「结束」节点里要取的那个;留空 = 自动取最长的文字</span></label><input type="text" id="dOut" value="${esc(D.outputKey||'')}" placeholder="如 text"></div>
           <div><label class="f">正文结束标记 <span class="hint">这个词之后的“审核说明”不参与校验;留空 = 全文校验</span></label><input type="text" id="dSplit" value="${esc(D.splitMarker||'')}"></div>
@@ -61,6 +61,7 @@ Admin.register({
       $$('[data-if]',el).forEach(e=>e.oninput=()=>{D.inputs[+e.dataset.if].fixed=e.value;A.mark('model');});
       $$('[data-is]',el).forEach(e=>e.onchange=()=>{D.inputs[+e.dataset.is].src=e.value;A.mark('model');draw();});
       $$('[data-id]',el).forEach(b=>b.onclick=()=>{D.inputs.splice(+b.dataset.id,1);A.mark('model');draw();});
+      const rc=$('#dRecommend',el); if(rc) rc.onclick=()=>{const d=JSON.parse(JSON.stringify(window.DEFAULTS.model.dify)); D.inputs=d.inputs; D.outputKey=d.outputKey; D.splitMarker=d.splitMarker; A.mark('model'); draw();};
       const ad=$('#addIn',el); if(ad) ad.onclick=()=>{D.inputs.push({var:'',src:'热点标题',fixed:''});A.mark('model');draw();};
       const pv=$('#mProv',el); if(pv) pv.onchange=()=>{
         m.provider=pv.value; const p=P[pv.value];

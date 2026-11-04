@@ -117,7 +117,7 @@ window.DEFAULTS = {
     judge:'你是严格的小红书内容评审。请对下面这篇笔记打分,七个维度各 1 到 5 分(整数):亲历感(有没有真实、具体的画面,而不是编出来的经历)、具体度(讲的是具体的人和事,还是空话)、坦诚(有没有把不确定的和局限说清楚)、评论区钩子(读完有没有想回应的点)、标题(能不能让这个画像点进来)、不像广告(像不像朋友聊天)、画像贴合(是不是真的在对这个画像说话)。并给一句点评。只输出 JSON,格式:{"亲历感":n,"具体度":n,"坦诚":n,"评论区钩子":n,"标题":n,"不像广告":n,"画像贴合":n,"点评":"一句话"}\n【素材】\n{素材}\n【笔记】\n{文案}'
   },
   model: {mode:'mock',provider:'deepseek',baseUrl:'https://api.deepseek.com/v1',model:'deepseek-chat',apiKey:'',temperature:0.9,reworkTemp:0.3,judgeTemp:0.2,stream:false,accessCode:'',
-    dify:{inputs:[{var:'query',src:'热点标题',fixed:''}],outputKey:'',splitMarker:'审核说明'}},
+    dify:{inputs:[{var:'hot_news',src:'热点标题+摘要',fixed:''},{var:'product',src:'商品名+卖点',fixed:''},{var:'persona',src:'客户画像全文',fixed:''},{var:'platform',src:'固定值',fixed:'小红书'}],outputKey:'final_report',splitMarker:''}},
   evalCases: []
 };
 window.PROVIDERS = {
