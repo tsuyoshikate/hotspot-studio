@@ -44,7 +44,7 @@ Admin.register({
       <div><label class="f">表情符号数量(最少 ~ 最多)</label><div class="row"><input type="number" data-n="minEmoji" value="${r.minEmoji}" style="width:90px"> ~ <input type="number" data-n="maxEmoji" value="${r.maxEmoji}" style="width:90px"></div></div>
       <div><label class="f">开关</label><label style="display:block;padding:4px 0"><input type="checkbox" data-b="ctaRequired" ${r.ctaRequired?'checked':''}> 结尾必须有互动引导</label><label style="display:block;padding:4px 0"><input type="checkbox" data-b="requireNewsTag" ${r.requireNewsTag?'checked':''}> 必须带热点话题标签</label><label style="display:block;padding:4px 0"><input type="checkbox" data-b="allowPrice" ${r.allowPrice?'checked':''}> 允许在笔记里写商品库里的价格(默认不写)</label></div>
     </div>
-    ${L('banned','广告法违禁词与绝对化承诺','顿号分隔,命中即硬伤。“第一次”不会被当成“第一”')}
+    ${L('banned','广告法违禁词与绝对化承诺','顿号分隔,命中即硬伤。“第一次、第一个、第一步”这类序数不会被当成“第一”')}
     ${L('brand','机构品牌名','正文和话题标签里不能出现')}
     ${L('scarcity','稀缺感 / 催促说法','没有真实依据的稀缺感,AI 写出来就是编造')}
     ${L('experience','疑似编造亲历的说法','比如“我亲测”“我接触过”')}

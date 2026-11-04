@@ -140,7 +140,7 @@ C.mockFix=function(text,ctx,res){
   const ids=new Set(res.checks.filter(c=>!c.pass).map(c=>c.id));
   const dropSentences=words=>{ t=t.split(/(?<=[。!?!?\n])/).filter(s=>!words.some(w=>s.includes(w))).join(''); };
   if(ids.has('markup')) t=t.replace(/\*\*|```/g,'').replace(/^\s*#{1,6}\s+/gm,'').replace(/^\s*[-*]\s+/gm,'');
-  if(ids.has('banned')) dropSentences(R.banned.filter(w=>t.replace(/第一次/g,'').includes(w)));
+  if(ids.has('banned')) dropSentences(R.banned.filter(w=>t.replace(ORD1,'').includes(w)));
   if(ids.has('scarcity')) dropSentences(R.scarcity||[]);
   if(ids.has('invented')) dropSentences(R.experience||[]);
   if(ids.has('selfqa')) dropSentences(R.selfQA||[]);
@@ -169,6 +169,8 @@ C.mockFix=function(text,ctx,res){
 };
 
 /* ───────── 机器校验 ───────── */
+// “第一次/第一个/第一步/第一句…”是序数,不是“第一名”式的绝对化用语
+const ORD1=/第一(?=[次个步句节天眼年课周遍章篇轮印时反件条点])/g;
 // 标题 = 第一行(去掉“标题:”前缀);Dify 返回的是整份报告,标题和排版符号这两项不查
 C.validate=function(text,ctx,rules){
   const R=rules||Store.get('rules'); const t=String(text||'');
@@ -179,7 +181,7 @@ C.validate=function(text,ctx,rules){
   const chars=body.replace(/\s/g,'').length;
   const checks=[]; const notes=[];
   const add=(id,label,pass,msg,weight,hard,fixable,okMsg)=>checks.push({id,label,pass,msg:pass&&okMsg?okMsg:msg,weight,hard:!!hard,fixable:fixable!==false});
-  const scan=body.replace(/第一次/g,''); // “第一次听懂原声”不算绝对化用语
+  const scan=body.replace(ORD1,''); // “第一次听懂原声”不算绝对化用语
   const mat=C.ctxMaterial(ctx);
   // 硬伤
   const hits=R.banned.filter(w=>scan.includes(w));
