@@ -286,11 +286,11 @@ function renderCopyRight(){
   else if(v.err) body=`<div class="alert bad" style="margin-top:14px"><div><b>生成失败</b><br>${esc(v.err)}<br><span class="hint">可到后台「模型参数」检查密钥、模型名和接入方式,或先切回本地模拟。</span></div></div><div style="padding:0 14px 14px"><button class="btn" id="retry">重试这一版</button></div>`;
   else{
     const r=v.res, mt=v.meta||{};
-    body=`<textarea class="copybox" id="copyText" style="width:calc(100% - 28px);min-height:200px;display:block">${esc(v.text)}</textarea>
+    body=`<textarea class="copybox" id="copyText" style="width:calc(100% - 28px);min-height:360px;display:block">${esc(v.text)}</textarea>
     <div class="row" style="padding:0 14px 12px">
       <button class="btn sm primary" id="copyBtn">一键复制</button><button class="btn sm" id="regenOne">↻ 重新生成</button>
       <span class="sp"></span><span class="hint" id="metaLine"></span></div>
-    <div id="alertBox"></div>`+(mt.cover||mt.report?`<div style="padding:0 14px 14px">${mt.cover?`<img src="${esc(mt.cover)}" alt="封面图" style="max-width:220px;border-radius:8px;display:block;margin-bottom:6px"><div class="hint" style="margin-bottom:8px">封面图链接约 24 小时后失效,请及时保存</div>`:''}${mt.review?`<div class="hint" style="white-space:pre-wrap;margin-bottom:8px">Dify 审核提示:\n${esc(mt.review)}</div>`:''}${mt.report?`<details><summary class="hint" style="cursor:pointer">查看 Dify 返回的完整报告</summary><pre style="white-space:pre-wrap;font-size:12px;max-height:320px;overflow:auto">${esc(mt.report)}</pre></details>`:''}</div>`:'');
+    <div id="alertBox"></div>`+(mt.cover||mt.report||mt.plan?`<div style="padding:0 14px 14px">${mt.cover?`<img src="${esc(mt.cover)}" alt="封面图" style="max-width:220px;border-radius:8px;display:block;margin-bottom:6px"><div class="hint" style="margin-bottom:8px">封面图链接约 24 小时后失效,请及时保存</div>`:''}${mt.review?`<div class="hint" style="white-space:pre-wrap;margin-bottom:8px">Dify 审核提示:\n${esc(mt.review)}</div>`:''}${mt.plan?`<details style="margin-bottom:6px"><summary class="hint" style="cursor:pointer">Dify 的写作方案(选题、商品、写法、发帖人)</summary><pre style="white-space:pre-wrap;font-size:12px">${esc(mt.plan)}</pre></details>`:''}${mt.report?`<details><summary class="hint" style="cursor:pointer">查看 Dify 返回的完整报告</summary><pre style="white-space:pre-wrap;font-size:12px;max-height:320px;overflow:auto">${esc(mt.report)}</pre></details>`:''}</div>`:'');
   }
   box.innerHTML=tabs+body;
   $$('.tabs button',box).forEach(b=>b.onclick=()=>{S.activeVer=+b.dataset.k;renderCopyRight();});

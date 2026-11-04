@@ -257,12 +257,23 @@ C.difyInputs=function(ctx,cfg){
 C.parseDifyReport=function(t){
   t=String(t||''); const cover=(t.match(/!\[[^\]]*\]\(([^)\s]+)\)/)||[])[1]||'';
   const m=t.match(/##\s*第\s*1\s*篇([\s\S]*?)(?=\n---|\n##\s|$)/);
-  if(!m) return {body:t.replace(/!\[[^\]]*\]\([^)]*\)/,'').replace(/^\*封面图链接.*$/m,''),cover,review:''};
+  if(!m) return {body:t.replace(/!\[[^\]]*\]\([^)]*\)/,'').replace(/^\*封面图链接.*$/m,''),cover,review:'',plan:''};
   let b=m[1]; let review='';
   b=b.replace(/^\s*原文[:：].*$/m,'');
   b=b.replace(/\*\*审核提示\*\*\s*\n(?:[ \t]*[-*•].*\n?)*/,x=>{review=x.replace(/\*\*审核提示\*\*/,'').trim();return '';});
   b=b.replace(/^\s*(通过|需修改|不通过|需人工判断)\s*$/m,'');
-  return {body:b.replace(/\n{3,}/g,'\n\n').trim(),cover,review};
+  b=b.replace(/\n{3,}/g,'\n\n').trim();
+  // 常见版式:标题行 + 【新闻要点】…【写给谁】(写作方案) + 【小红书笔记】正文 + 【话题标签】
+  let plan='';
+  const ni=b.indexOf('【小红书笔记】');
+  if(ni>=0){
+    const head=b.slice(0,ni).trim(); let note=b.slice(ni+'【小红书笔记】'.length).trim();
+    const lines=head.split('\n'); const ti=lines.findIndex(x=>x.trim()&&!x.trim().startsWith('【'));
+    const title=ti>=0?lines[ti].trim().replace(/^标题[:：]\s*/,''):''; plan=lines.filter((x,k)=>k!==ti).join('\n').trim();
+    note=note.replace(/【话题标签】\s*/,'');
+    b=(title?title+'\n\n':'')+note;
+  }
+  return {body:b,cover,review,plan};
 };
 C.callDify=async function(ctx,opt){
   opt=opt||{}; const m=opt.modelCfg||Store.get('model'); const cfg=m.dify||{inputs:[]}; const t0=performance.now();
@@ -284,7 +295,7 @@ C.callDify=async function(ctx,opt){
   if(!text) throw new Error('Dify 返回成功,但输出里没有文字。返回的输出变量有:'+(Object.keys(outs).join('、')||'无')+'。请在「模型参数」里填对“输出变量名”');
   if(typeof text!=='string') text=JSON.stringify(text,null,2);
   const rep=C.parseDifyReport(text);
-  return {text:rep.body.trim(),report:text,cover:rep.cover,review:rep.review,ms:Math.round(performance.now()-t0),usage:{in:0,out:j.tokens||0},model:'Dify 工作流',via:'Dify 工作流',mock:false,outKeys:Object.keys(outs),runId:j.runId,warn:j.status==='partial-succeeded'?('Dify 有部分节点失败,文案已产出(多半是图片或视频那一步),请到 Dify 运行日志查看'+(j.error?':'+j.error:'')):''};
+  return {text:rep.body.trim(),report:text,cover:rep.cover,review:rep.review,plan:rep.plan,ms:Math.round(performance.now()-t0),usage:{in:0,out:j.tokens||0},model:'Dify 工作流',via:'Dify 工作流',mock:false,outKeys:Object.keys(outs),runId:j.runId,warn:j.status==='partial-succeeded'?('Dify 有部分节点失败,文案已产出(多半是图片或视频那一步),请到 Dify 运行日志查看'+(j.error?':'+j.error:'')):''};
 };
 
 /* ───────── 生成与修正 ───────── */
