@@ -2,7 +2,7 @@
 (function(){
 const S = {
   step:1, news:[], fetchInfo:null, selNews:null,
-  showAll:false, products:[], selProducts:[], versions:[], activeVer:0, approved:false, persona:null, adopted:null, gen:0
+  showAll:false, products:[], selProducts:[], versions:[], activeVer:0, approved:false, persona:null, platform:'小红书', adopted:null, gen:0
 };
 const STEPS=[
   ['新闻抓取','监控热点新闻'],['建议匹配商品','系统智能推荐'],['匹配商品','商品库深度筛选'],['创作文案','小红书笔记生成'],['审核并发送','合规审核·模拟发布']
@@ -224,7 +224,7 @@ function viewLibrary(){
 const LETTERS='ABCDEFGH';
 const personaObj=()=>Store.get('personas').find(x=>x.id===S.persona)||null;
 const matCard=()=>{const m=Core.matchMaterial(S.selNews);return m?m.card:null;};
-const ctxFor=(style)=>({news:S.selNews,products:S.selProducts,persona:personaObj(),material:matCard(),style});
+const ctxFor=(style)=>({news:S.selNews,products:S.selProducts,persona:personaObj(),material:matCard(),style,platform:S.platform});
 const lenOf=t=>String(t).replace(/\s/g,'').length;
 async function genVersion(i){
   const v=S.versions[i]; v.loading=true; v.err=null; renderCopyRight();
@@ -260,6 +260,7 @@ function viewCopy(){
         <h6 style="margin:14px 0 8px;font-size:11px;color:var(--ink3);letter-spacing:.08em;font-weight:500">这次对谁说 PERSONA</h6>
         <div class="chips" id="personas">${ps.map(x=>`<span class="chip ${x.id===S.persona?'on':''}" data-p="${esc(x.id)}" title="${esc(x.who)}">${esc(x.name)}</span>`).join('')}</div>
         <div class="hint" style="margin-bottom:10px">${pn?esc(pn.who):''}${S.selProducts.some(p=>(p.personas||[]).includes(S.persona))?'':'<br><span style="color:var(--warn)">所选商品没有挂这个画像,可到后台调整</span>'}</div>
+        ${m.mode==='dify'?`<h6 style="margin:4px 0 8px;font-size:11px;color:var(--ink3);letter-spacing:.08em;font-weight:500">发布平台 PLATFORM</h6><div class="chips" id="plats" style="margin-bottom:6px">${['小红书','抖音'].map(x=>`<span class="chip ${x===S.platform?'on':''}" data-pl="${x}">${x}</span>`).join('')}</div><div class="hint" style="margin-bottom:12px">${S.platform==='抖音'?'抖音会同时提交一条 6 秒动态封面视频(无字幕、无口播),约 3~5 分钟后用「取视频」获取':'小红书:图文笔记 + 封面图'}</div>`:''}
         <h6 style="margin:4px 0 8px;font-size:11px;color:var(--ink3);letter-spacing:.08em;font-weight:500">真实素材 MATERIAL</h6>
         <div class="hint" style="margin-bottom:12px">${mat?`<b class="chk-ok">命中</b>「${esc(mat.title)}」<br>只能写卡片里「可以写」的内容`:'没有对得上的素材卡(默认不用)<br>文案里不会出现个人经历或学员故事'}</div>
         <button class="btn primary" style="width:100%" id="btnRegen">${S.versions.length?'重新生成文案':'生成文案'}</button>
@@ -270,6 +271,7 @@ function viewCopy(){
     </div>
     <div class="foot"><button class="btn" id="back3">← 返回匹配商品</button><span class="sp"></span>
       <button class="btn green" id="adopt" ${S.versions.some(v=>v.text)?'':'disabled'}>采用当前版本,去审核 →</button></div>`;
+  $$('#plats .chip').forEach(c=>c.onclick=()=>{S.platform=c.dataset.pl;if(S.versions.length){S.versions=[];S.approved=false;S.adopted=null;}viewCopy();});
   $$('#personas .chip').forEach(c=>c.onclick=()=>{S.persona=c.dataset.p;if(S.versions.length){S.versions=[];S.approved=false;S.adopted=null;}viewCopy();});
   $('#btnRegen').onclick=startGenerate;
   $('#back3').onclick=()=>goStep(3);
@@ -290,7 +292,7 @@ function renderCopyRight(){
     <div class="row" style="padding:0 14px 12px">
       <button class="btn sm primary" id="copyBtn">一键复制</button><button class="btn sm" id="regenOne">↻ 重新生成</button>
       <span class="sp"></span><span class="hint" id="metaLine"></span></div>
-    <div id="alertBox"></div>`+(mt.cover||mt.report||mt.plan?`<div style="padding:0 14px 14px">${mt.cover?`<img src="${esc(mt.cover)}" alt="封面图" style="max-width:220px;border-radius:8px;display:block;margin-bottom:6px"><div class="hint" style="margin-bottom:8px">封面图链接约 24 小时后失效,请及时保存</div>`:''}${mt.review?`<div class="hint" style="white-space:pre-wrap;margin-bottom:8px">Dify 审核提示:\n${esc(mt.review)}</div>`:''}${mt.plan?`<details style="margin-bottom:6px"><summary class="hint" style="cursor:pointer">Dify 的写作方案(选题、商品、写法、发帖人)</summary><pre style="white-space:pre-wrap;font-size:12px">${esc(mt.plan)}</pre></details>`:''}${mt.report?`<details><summary class="hint" style="cursor:pointer">查看 Dify 返回的完整报告</summary><pre style="white-space:pre-wrap;font-size:12px;max-height:320px;overflow:auto">${esc(mt.report)}</pre></details>`:''}</div>`:'');
+    <div id="alertBox"></div>`+(mt.cover||mt.report||mt.plan?`<div style="padding:0 14px 14px">${mt.cover?`<img src="${esc(mt.cover)}" alt="封面图" style="max-width:220px;border-radius:8px;display:block;margin-bottom:6px"><div class="hint" style="margin-bottom:8px">封面图链接约 24 小时后失效,请及时保存</div>`:''}${mt.taskId?`<div class="card pad" style="background:var(--bg);margin-bottom:8px"><b>动态封面视频</b> <span class="hint">任务号 ${esc(mt.taskId)}</span><div class="hint" style="margin:4px 0 8px">${esc(mt.videoNote||'视频要几分钟才能生成,没好就等一会再点')}</div><button class="btn sm primary" id="getVideo">取视频</button><div id="videoOut" style="margin-top:8px"></div></div>`:''}${mt.review?`<div class="hint" style="white-space:pre-wrap;margin-bottom:8px">Dify 审核提示:\n${esc(mt.review)}</div>`:''}${mt.plan?`<details style="margin-bottom:6px"><summary class="hint" style="cursor:pointer">Dify 的写作方案(选题、商品、写法、发帖人)</summary><pre style="white-space:pre-wrap;font-size:12px">${esc(mt.plan)}</pre></details>`:''}${mt.report?`<details><summary class="hint" style="cursor:pointer">查看 Dify 返回的完整报告</summary><pre style="white-space:pre-wrap;font-size:12px;max-height:320px;overflow:auto">${esc(mt.report)}</pre></details>`:''}</div>`:'');
   }
   box.innerHTML=tabs+body;
   $$('.tabs button',box).forEach(b=>b.onclick=()=>{S.activeVer=+b.dataset.k;renderCopyRight();});
@@ -298,6 +300,7 @@ function renderCopyRight(){
   if(v.text&&!v.loading&&!v.err){
     $('#regenOne',box).onclick=()=>genVersion(i);
     $('#copyBtn',box).onclick=()=>copyText(v.text);
+    const gv=$('#getVideo',box); if(gv) gv.onclick=async()=>{ const out=$('#videoOut',box); gv.disabled=true; out.innerHTML='<span class="spin"></span> 正在查询…'; try{ const r=await Core.fetchDifyVideo(v.meta.taskId); out.innerHTML=(r.url?`<video src="${esc(r.url)}" controls playsinline style="max-width:240px;border-radius:8px;display:block;margin-bottom:6px"></video><a href="${esc(r.url)}" target="_blank" rel="noopener">下载视频</a> <span class="hint">链接有时效,请及时保存</span>`:'')+(r.url?'':`<div class="hint" style="white-space:pre-wrap">${esc(r.text||'没有取到内容')}</div>`); }catch(e){ out.innerHTML=`<div class="alert bad" style="margin:0"><div>${esc(e.message)}</div></div>`; } gv.disabled=false; };
     let tm; $('#copyText',box).oninput=e=>{v.text=e.target.value;v.res=Core.validate(v.text,ctxFor(v.style));clearTimeout(tm);tm=setTimeout(()=>{drawMeta(v);drawAlert(v,i);updateTabDots();},250);};
     drawMeta(v); drawAlert(v,i);
   }

@@ -253,13 +253,15 @@ C.difySource=function(src,ctx,fixed){
   return '';
 };
 C.difyInputs=function(ctx,cfg){
-  const o={}; ((cfg&&cfg.inputs)||[]).forEach(x=>{ if(x.var&&x.var.trim()) o[x.var.trim()]=String(C.difySource(x.src,ctx,x.fixed)).slice(0,4000); }); return o;
+  const o={}; ((cfg&&cfg.inputs)||[]).forEach(x=>{ if(x.var&&x.var.trim()) o[x.var.trim()]=String(C.difySource(x.src,ctx,x.fixed)).slice(0,4000); });
+  if(ctx&&ctx.platform&&o.platform!==undefined) o.platform=ctx.platform; // 工作台里选的发布平台优先
+  return o;
 };
 // Dify 返回的是整份 Markdown 报告:封面图 + 若干篇 + 跳过的新闻。工作台指定了热点,取「第 1 篇」当正文。
 C.parseDifyReport=function(t){
-  t=String(t||''); const cover=(t.match(/!\[[^\]]*\]\(([^)\s]+)\)/)||[])[1]||'';
+  t=String(t||'').replace(/\r\n?/g,'\n'); const cover=(t.match(/!\[[^\]]*\]\(([^)\s]+)\)/)||[])[1]||'';
   const m=t.match(/##\s*第\s*1\s*篇([\s\S]*?)(?=\n---|\n##\s|$)/);
-  if(!m) return {body:t.replace(/!\[[^\]]*\]\([^)]*\)/,'').replace(/^\*封面图链接.*$/m,''),cover,review:'',plan:''};
+  if(!m) return {body:t.replace(/!\[[^\]]*\]\([^)]*\)/,'').replace(/^\*封面图链接.*$/m,''),cover,review:'',plan:'',taskId:(t.match(/任务号[\s`：:]*`?(\d{6,})`?/)||[])[1]||'',videoNote:''};
   let b=m[1]; let review='';
   b=b.replace(/^\s*原文[:：].*$/m,'');
   b=b.replace(/\*\*审核提示\*\*\s*\n(?:[ \t]*[-*•].*\n?)*/,x=>{review=x.replace(/\*\*审核提示\*\*/,'').trim();return '';});
@@ -275,7 +277,14 @@ C.parseDifyReport=function(t){
     note=note.replace(/【话题标签】\s*/,'');
     b=(title?title+'\n\n':'')+note;
   }
-  return {body:b,cover,review,plan};
+  let taskId=(t.match(/任务号[\s`：:]*`?(\d{6,})`?/)||[])[1]||''; let videoNote=(t.match(/\*\*动态封面\*\*[^\n]*/)||[''])[0].replace(/\*\*/g,'').replace(/任务号\s*`?\d+`?。?/,'').replace(/约 3 到 5 分钟后.*$/,'约 3 到 5 分钟后点「取视频」').trim();
+  if(ni<0&&b.indexOf('【抖音文案】')>=0){
+    const ci=b.indexOf('【封面大字】'); const head=ci>=0?b.slice(0,ci).trim():''; const rest=ci>=0?b.slice(ci):b;
+    const lines=head.split('\n'); const ti=lines.findIndex(x=>x.trim()&&!x.trim().startsWith('【'));
+    const title=ti>=0?lines[ti].trim():''; plan=lines.filter((x,k)=>k!==ti).join('\n').trim();
+    b=(title?title+'\n\n':'')+rest.replace(/【话题标签】\s*/,'');
+  }
+  return {body:b,cover,review,plan,taskId,videoNote};
 };
 C.callDify=async function(ctx,opt){
   opt=opt||{}; const m=opt.modelCfg||Store.get('model'); const cfg=m.dify||{inputs:[]}; const t0=performance.now();
@@ -297,9 +306,20 @@ C.callDify=async function(ctx,opt){
   if(!text) throw new Error('Dify 返回成功,但输出里没有文字。返回的输出变量有:'+(Object.keys(outs).join('、')||'无')+'。请在「模型参数」里填对“输出变量名”');
   if(typeof text!=='string') text=JSON.stringify(text,null,2);
   const rep=C.parseDifyReport(text);
-  return {text:rep.body.trim(),report:text,cover:rep.cover,review:rep.review,plan:rep.plan,ms:Math.round(performance.now()-t0),usage:{in:0,out:j.tokens||0},model:'Dify 工作流',via:'Dify 工作流',mock:false,outKeys:Object.keys(outs),runId:j.runId,warn:j.status==='partial-succeeded'?('Dify 有部分节点失败,文案已产出(多半是图片或视频那一步),请到 Dify 运行日志查看'+(j.error?':'+j.error:'')):''};
+  return {text:rep.body.trim(),report:text,cover:rep.cover,review:rep.review,plan:rep.plan,taskId:rep.taskId,videoNote:rep.videoNote,ms:Math.round(performance.now()-t0),usage:{in:0,out:j.tokens||0},model:'Dify 工作流',via:'Dify 工作流',mock:false,outKeys:Object.keys(outs),runId:j.runId,warn:j.status==='partial-succeeded'?('Dify 有部分节点失败,文案已产出(多半是图片或视频那一步),请到 Dify 运行日志查看'+(j.error?':'+j.error:'')):''};
 };
 
+// 用任务号再调一次 Dify(只传 task_id),取视频下载链接
+C.fetchDifyVideo=async function(taskId){
+  const m=Store.get('model'); const cfg=m.dify||{};
+  const r=await fetch('/api/dify',{method:'POST',headers:{'content-type':'application/json','x-access-code':m.accessCode||''},body:JSON.stringify({inputs:{task_id:String(taskId)}})});
+  const raw=await r.text(); let j=null; try{j=JSON.parse(raw);}catch(e){}
+  if(!r.ok||!j) throw new Error((j&&j.error&&(j.error.message||j.error))||('调用失败('+r.status+')'));
+  if(j.status&&j.status!=='succeeded'&&j.status!=='partial-succeeded') throw new Error('Dify 没有成功:'+(j.error||j.status));
+  const outs=j.outputs||{}; let text=cfg.outputKey&&outs[cfg.outputKey]!=null?outs[cfg.outputKey]:(Object.values(outs).filter(v=>typeof v==='string').sort((a,b)=>b.length-a.length)[0]||'');
+  text=String(text); const mm=text.match(/\]\((https?:[^)\s]+)\)/)||text.match(/(https?:\/\/[^\s)]+)/);
+  return {text:text.trim(),url:mm?mm[1]:''};
+};
 /* ───────── 生成与修正 ───────── */
 const sleep=ms=>new Promise(r=>setTimeout(r,ms));
 // 生成一版文案。返回 {text,ms,usage,model,via,mock}
